@@ -1,0 +1,64 @@
+# Docker Compose для МосПолитех бота
+# Использование: docker-compose up -d
+
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: mospolytech_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - bot_db:/app/db
+    depends_on:
+      - db
+      - redis
+    networks:
+      - bot_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: mospolytech_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-botuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-botpassword}
+      POSTGRES_DB: ${DB_NAME:-mospolytech_bot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-botuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mospolytech_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  bot_db:
+
+networks:
+  bot_network:
+    driver: bridge
+
